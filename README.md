@@ -1,9 +1,8 @@
 # Modular DRL Gym Env for Robots with PyBullet
 
 
-<p float="left">
-  <img src="https://github.com/ignc-research/IR-DRL/blob/sim2real/docs/gifs/GifReal.gif" width="400" />
-  <img src="https://github.com/ignc-research/IR-DRL/blob/sim2real/docs/gifs/GifSim.gif" width="400" /> 
+<p align="center">
+  <img src="docs/gifs/eval.gif" width="800" alt="Robot Evaluation Demo" />
 </p>
 
 
@@ -14,6 +13,14 @@ This repository provides a platform for training virtual agents in robotics task
 An integral part of this project is the implementation of a transition mechanism from a simulated to a real-world environment. By leveraging the functionalty of ROS (Robot Operating System) and Voxelisation techniques with Open 3D, there is a system established that can effectively deploy trained models into real-world scenarios. There they are able to deal with static and dynamic obstacles.
 
 This project is intended to serve as a resource for researchers, robotics enthusiasts, and professional developers interested in the application of Deep Reinforcement Learning in robotics.
+
+## Reference
+
+This work is based on the paper: **"Deep-Reinforcement-Learning-based Path Planning for Industrial Robots using Distance Sensors as Observation"**.
+
+## Training Performance
+
+The model was successfully trained on Apple Silicon (Mac M1) hardware. Training sessions of approximately 8 hours demonstrated efficient convergence and stable learning performance, showcasing the capability of running DRL training workloads on modern ARM-based processors.
 
 ## Getting Started
 
