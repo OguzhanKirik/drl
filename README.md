@@ -16,7 +16,8 @@ This project is intended to serve as a resource for researchers, robotics enthus
 
 ## Reference
 
-This work is based on the paper: **"Deep-Reinforcement-Learning-based Path Planning for Industrial Robots using Distance Sensors as Observation"**.
+This work is based on the paper: **"Deep-Reinforcement-Learning-based Path Planning for Industrial Robots using Distance Sensors as Observation"**. 
+PaperLink: https://arxiv.org/abs/2301.05980
 
 ## Training Performance
 
