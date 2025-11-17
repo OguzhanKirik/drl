@@ -57,6 +57,40 @@ noise_map = {
 }
 
 if __name__ == "__main__":
+    # Set device for training (Mac GPU support)
+    import torch
+    import numpy as np
+    import gym
+    
+    # Float32 wrapper for single environments (eval mode)
+    class Float32WrapperSingle(gym.Wrapper):
+        def reset(self, **kwargs):
+            obs = self.env.reset(**kwargs)
+            return self._convert_obs(obs)
+        
+        def step(self, action):
+            obs, reward, done, info = self.env.step(action)
+            return self._convert_obs(obs), reward, done, info
+        
+        def _convert_obs(self, obs):
+            if isinstance(obs, dict):
+                return {key: val.astype(np.float32) if isinstance(val, np.ndarray) else val 
+                        for key, val in obs.items()}
+            return obs.astype(np.float32) if isinstance(obs, np.ndarray) else obs
+    
+    if torch.backends.mps.is_available():
+        device = "mps"
+        print(f"Using Mac GPU (MPS) for training")
+        # MPS doesn't support float64, force numpy to use float32
+        np.set_printoptions(precision=8)
+        # We'll handle the conversion in the wrapper below
+    elif torch.cuda.is_available():
+        device = "cuda"
+        print(f"Using NVIDIA GPU (CUDA) for training")
+    else:
+        device = "cpu"
+        print(f"Using CPU for training (no GPU available)")
+    
     if args.planner == "":
         algorithm = algo_map[run_config["algorithm"]["type"]][0]
         policy = algo_map[run_config["algorithm"]["type"]][1]
@@ -71,6 +105,30 @@ if __name__ == "__main__":
             
             # create parallel envs
             envs = SubprocVecEnv([return_train_env_outer(i) for i in range(run_config["num_envs"])])
+            
+            # Wrap environments to convert float64 to float32 for MPS compatibility
+            if device == "mps":
+                from stable_baselines3.common.vec_env import VecEnvWrapper
+                class Float32Wrapper(VecEnvWrapper):
+                    def reset(self):
+                        obs = self.venv.reset()
+                        return self._convert_obs(obs)
+                    
+                    def step_async(self, actions):
+                        self.venv.step_async(actions)
+                    
+                    def step_wait(self):
+                        obs, rewards, dones, infos = self.venv.step_wait()
+                        return self._convert_obs(obs), rewards, dones, infos
+                    
+                    def _convert_obs(self, obs):
+                        if isinstance(obs, dict):
+                            return {key: val.astype(np.float32) if isinstance(val, np.ndarray) else val 
+                                    for key, val in obs.items()}
+                        return obs.astype(np.float32) if isinstance(obs, np.ndarray) else obs
+                
+                envs = Float32Wrapper(envs)
+
 
             # callbacks
             checkpoint_callback = CheckpointCallback(save_freq=run_config["save_freq"], save_path=run_config["save_folder"] + "/" + run_config["algorithm"]["type"] + "_" + run_config["save_name"], name_prefix="model")
@@ -83,11 +141,11 @@ if __name__ == "__main__":
                 if "action_noise" in run_config["algorithm"]["config"]:
                     import numpy as np
                     run_config["algorithm"]["config"]["action_noise"] = noise_map[run_config["algorithm"]["config"]["action_noise"][0]](mean=np.zeros(run_config["algorithm"]["config"]["action_noise"][1]), sigma=np.ones(run_config["algorithm"]["config"]["action_noise"][1]))
-                model = algorithm(policy, envs, policy_kwargs=run_config["custom_policy"], verbose=1, tensorboard_log="./models/tensorboard_logs", **run_config["algorithm"]["config"])
+                model = algorithm(policy, envs, policy_kwargs=run_config["custom_policy"], verbose=1, tensorboard_log="./models/tensorboard_logs", device=device, **run_config["algorithm"]["config"])
                 print(model.policy)
             else:
                 try:
-                    model = algorithm.load(run_config["algorithm"]["model_path"], env=envs, tensorboard_log="./models/tensorboard_logs", custom_objects=run_config["algorithm"]["config"])
+                    model = algorithm.load(run_config["algorithm"]["model_path"], env=envs, tensorboard_log="./models/tensorboard_logs", device=device, custom_objects=run_config["algorithm"]["config"])
                     # needs to be set on some PCs when loading a model, dont know why, might not be needed on yours
                     if run_config["algorithm"]["type"] == "PPO":
                         model.policy.optimizer.param_groups[0]["capturable"] = True
@@ -112,15 +170,18 @@ if __name__ == "__main__":
         else:
             env_config["env_id"] = 0
             env = ModularDRLEnv(env_config)
+            # Wrap with Float32Wrapper for MPS compatibility
+            if device == "mps":
+                env = Float32WrapperSingle(env)
             if not run_config["algorithm"]["load_model"]:
                 # no extra case for recurrent model here, this would act exatcly the same way here as a new PPO does
                 # we use PPO here, but as its completely untrained might just be any model really
-                model = PPO("MultiInputPolicy", env, verbose=1)
+                model = PPO("MultiInputPolicy", env, verbose=1, device=device)
             else:
                 # this try except will fail if the env's observation space doesn't match with the one from the model
                 # the standard error message by sb3 isn't very helpful, so this piece of code will pinpoint exactly what
                 try:
-                    model = algorithm.load(run_config["algorithm"]["model_path"], env=env)
+                    model = algorithm.load(run_config["algorithm"]["model_path"], env=env, device=device)
                 except ValueError:
                     from stable_baselines3.common.save_util import load_from_zip_file
                     data, _, _ = load_from_zip_file(

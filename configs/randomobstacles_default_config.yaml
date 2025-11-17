@@ -2,7 +2,7 @@
 run:
   algorithm:
     load_model: True  
-    model_path: "./models/weights/PPO_randomobstacles_default/model_1440000_steps.zip"  
+    model_path: "./models/weights/PPO_randomobstacles_default/model_6720000_steps.zip"  
     type: "PPO"
     custom_policy:
       activation_function: "ReLU"
@@ -26,7 +26,7 @@ run:
   eval:
     max_episodes: -1  
     logging: 1  
-    display_delay: 0.01 
+    display_delay: 0.001 
     show_world_aux: True
     show_goal_aux: True
     show_sensor_aux: False
@@ -48,6 +48,8 @@ env:
         base_orientation: [0, 0, 0]
         resting_angles: [0, 90, -30, -120, -80, 90]
         control_mode: 0
+        ik_xyz_delta: 0.05
+        ik_rpy_delta: 0.05
         self_collision: False
       sensors:
         - type: "LidarSensorUR5"
