@@ -37,16 +37,18 @@ class Box(Obstacle):
                  velocity: float=0, 
                  halfExtents=[1, 1, 1], 
                  color=[0.5,0.5,0.5,1],
-                 seen_by_obstacle_sensor: bool=True) -> None:
+                 seen_by_obstacle_sensor: bool=True,
+                 mass: float=0) -> None:
         super().__init__(position, rotation, trajectory, sim_step, sim_steps_per_env_step, velocity, seen_by_obstacle_sensor)
 
         self.color = color
         self.halfExtents = halfExtents
+        self.mass = mass
 
     def build(self) -> int:
         self.object_id = pyb_u.create_box(position=self.position_orig,
                                           orientation=self.orientation_orig,
-                                          mass=0,
+                                          mass=self.mass,
                                           halfExtents=self.halfExtents,
                                           color=self.color)
         return self.object_id
