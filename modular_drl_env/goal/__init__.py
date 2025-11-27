@@ -27,3 +27,5 @@ GoalRegistry.register('PositionCollisionNoShaking')(PositionCollisionGoalNoShaki
 GoalRegistry.register('PositionCollisionNoShakingProximity')(PositionCollisionGoalNoShakingProximity)
 GoalRegistry.register('PositionCollisionNoShakingProximityV2')(PositionCollisionGoalNoShakingProximityV2)
 GoalRegistry.register('PositionCollisionNoShakingProximityV3')(PositionCollisionGoalNoShakingProximityV3)
+GoalRegistry.register('ReachAndTouch')(ReachAndTouchGoal)
+GoalRegistry.register('GraspObject')(GraspObjectGoal)

@@ -7,3 +7,5 @@ from .random_boxes import RandomBoxesWorld
 from .avoid_obstacle import AvoidObstacle
 from .plateexperiment import PlateExperiment
 from .s2r_experiment import S2RExperiment, S2RExperimentVoxels
+from .simple_demo import SimpleDemoWorld
+from .manipulate_objects import ManipulateObjects

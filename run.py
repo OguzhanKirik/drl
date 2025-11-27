@@ -60,23 +60,6 @@ if __name__ == "__main__":
     # Set device for training (Mac GPU support)
     import torch
     import numpy as np
-    import gym
-    
-    # Float32 wrapper for single environments (eval mode)
-    class Float32WrapperSingle(gym.Wrapper):
-        def reset(self, **kwargs):
-            obs = self.env.reset(**kwargs)
-            return self._convert_obs(obs)
-        
-        def step(self, action):
-            obs, reward, done, info = self.env.step(action)
-            return self._convert_obs(obs), reward, done, info
-        
-        def _convert_obs(self, obs):
-            if isinstance(obs, dict):
-                return {key: val.astype(np.float32) if isinstance(val, np.ndarray) else val 
-                        for key, val in obs.items()}
-            return obs.astype(np.float32) if isinstance(obs, np.ndarray) else obs
     
     if torch.backends.mps.is_available():
         device = "mps"
@@ -170,9 +153,21 @@ if __name__ == "__main__":
         else:
             env_config["env_id"] = 0
             env = ModularDRLEnv(env_config)
-            # Wrap with Float32Wrapper for MPS compatibility
+            
+            # Wrap environment for MPS compatibility
             if device == "mps":
-                env = Float32WrapperSingle(env)
+                import gym
+                class Float32ObsWrapper(gym.ObservationWrapper):
+                    def observation(self, obs):
+                        """Convert all observations to float32 for MPS compatibility."""
+                        if isinstance(obs, dict):
+                            return {key: val.astype(np.float32) if isinstance(val, np.ndarray) and val.dtype == np.float64 else val 
+                                    for key, val in obs.items()}
+                        elif isinstance(obs, np.ndarray) and obs.dtype == np.float64:
+                            return obs.astype(np.float32)
+                        return obs
+                env = Float32ObsWrapper(env)
+            
             if not run_config["algorithm"]["load_model"]:
                 # no extra case for recurrent model here, this would act exatcly the same way here as a new PPO does
                 # we use PPO here, but as its completely untrained might just be any model really
