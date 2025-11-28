@@ -13,15 +13,17 @@ class Sphere(Obstacle):
                  velocity: float=0, 
                  radius: float=1, 
                  color: list=[0.75,0.75,0.75,1],
-                 seen_by_obstacle_sensor: bool=True) -> None:
+                 seen_by_obstacle_sensor: bool=True,
+                 mass: float=0) -> None:
         super().__init__(position, np.array([0, 0, 0, 1]), trajectory, sim_step, sim_steps_per_env_step, velocity, seen_by_obstacle_sensor)
 
         self.radius = radius
         self.color = color
+        self.mass = mass
 
     def build(self) -> int:
         self.object_id = pyb_u.create_sphere(position=self.position_orig,
-                                             mass=0,
+                                             mass=self.mass,
                                              radius=self.radius,
                                              color=self.color)
         return self.object_id
@@ -65,17 +67,19 @@ class Cylinder(Obstacle):
                  radius: float=1, 
                  height: float=1, 
                  color: list=[0.65,0.65,0.65,1],
-                 seen_by_obstacle_sensor: bool=True) -> None:
+                 seen_by_obstacle_sensor: bool=True,
+                 mass: float=0) -> None:
         super().__init__(position, rotation, trajectory, sim_step, sim_steps_per_env_step, velocity, seen_by_obstacle_sensor)
 
         self.radius = radius
         self.color = color
         self.height = height
+        self.mass = mass
 
     def build(self) -> int:
         self.object_id = pyb_u.create_cylinder(position=self.position_orig,
                                                orientation=self.orientation_orig,
-                                               mass=0,
+                                               mass=self.mass,
                                                radius=self.radius,
                                                height=self.height,
                                                color=self.color)

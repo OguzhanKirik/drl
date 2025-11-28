@@ -6,6 +6,7 @@ Shows how to use the UR5-specific sensor implementation.
 
 import sys
 import time
+import cv2
 import numpy as np
 import pybullet as pyb
 
@@ -16,7 +17,11 @@ from modular_drl_env.util.pybullet_util import pybullet_util as pyb_u
 from modular_drl_env.robot.robot_implementations.ur5 import UR5_Gripper
 from modular_drl_env.sensor.sensor_implementations.forcetorquesensor import ForceTorqueSensorUR5
 from modular_drl_env.sensor.sensor_implementations.positional import PositionRotationSensor, JointsSensor
-from modular_drl_env.world.obstacles.shapes import Box
+from modular_drl_env.world.obstacles.shapes import Box, Sphere, Cylinder
+from modular_drl_env.sensor.sensor_implementations.camera.camera_implementations.camera_implementations import (
+    StaticBodyCameraUR5, 
+    StaticFloatingCamera
+)
 
 class SimpleWorld:
     """Minimal world for testing."""
@@ -69,7 +74,7 @@ def main():
     # Place it on the ground - small box for testing
     box_half_extent = 0.02  # 2cm half-extent = 4cm cube
     test_box = Box(
-        position=[0.3, 0.0, box_half_extent],  # z = halfExtent so box sits on ground
+        position=[-0.3, 0.3, box_half_extent],  # z = halfExtent so box sits on ground
         rotation=[0, 0, 0],
         trajectory=[],
         sim_step=0.01,
@@ -82,7 +87,43 @@ def main():
     )
     test_box.build()
     world.objects.append(test_box)
-    
+
+
+    sphere_radius = 0.02  # 2cm radius sphere
+    test_sphere = Sphere(
+        position=[0.3, 0.3, sphere_radius],  # z = radius so sphere sits on ground
+        trajectory=[],
+        sim_step=0.01,
+        sim_steps_per_env_step=1,
+        velocity=0,
+        radius=sphere_radius,
+        color=[0, 1, 0, 1],  # Green sphere
+        seen_by_obstacle_sensor=True,
+        mass=0.05  # Add mass to make sphere dynamic (movable)
+    )
+    test_sphere.build()
+    world.objects.append(test_sphere)
+
+
+    cylinder_radius = 0.02  # 2cm radius
+    cylinder_height = 0.08  # 8cm height
+    test_cylinder = Cylinder(
+        position=[0.0, 0.3, cylinder_height/2],  # z = height/2 so cylinder sits on ground
+        rotation=[0, 0, 0],
+        trajectory=[],
+        sim_step=0.01,
+        sim_steps_per_env_step=1,
+        velocity=0,
+        radius=cylinder_radius,
+        height=cylinder_height,
+        color=[0, 0, 1, 1],  # Blue cylinder
+        seen_by_obstacle_sensor=True,
+        mass=0.05  # Add mass to make cylinder dynamic (movable)
+    )
+    test_cylinder.build()
+    world.objects.append(test_cylinder)
+
+
     print(f"✅ Created test box at position: {test_box.position}, mass: 0.05 kg, size: 4cm cube")
     
     # Create UR5 robot with gripper
@@ -95,7 +136,7 @@ def main():
         base_position=[0, 0, 0.0],
         base_orientation=[0, 0, 0, 1],
         resting_angles=np.array([0, -1.57, -1.57, -1.57, 1.57, 0, 0.015, 0.015]),
-        control_mode=0,
+        control_mode=0,  # Use IK delta control mode
         ik_xyz_delta=0.05,
         ik_rpy_delta=0.05,
         gripper_control=True
@@ -119,6 +160,56 @@ def main():
         add_to_logging=True,
         update_steps=1
     )
+    
+    print(f"✅ Created Force/Torque Sensor (UR5-specific)")
+    print(f"   Measuring at joint: {ft_sensor.joint_name}")
+    print(f"   Force limit: {ft_sensor.force_limit}N")
+    print(f"   Torque limit: {ft_sensor.torque_limit}Nm")
+    
+    # Create Camera Sensors
+    # Camera 1: Mounted on robot end-effector (moves with robot)
+    camera_args = {
+        'type': 'rgb',  # Options: 'rgb', 'rgbd', 'grayscale'
+        'width': 1920,
+        'height': 1080,
+        'fov': 60,
+        'aspect': 1,
+        'near_val': 0.05,
+        'far_val': 2,  # Must be int to match default type
+        'up_vector': [0, 0, 1]
+    }
+    
+    ee_camera = StaticBodyCameraUR5(
+        robot=robot,
+        position_relative_to_effector=[0.0, 0.0, 0.05],  # 5cm offset from end-effector
+        camera_args=camera_args,
+        name='end_effector_camera',
+        normalize=False,
+        add_to_observation_space=False,  # Set True if you want it in observations
+        add_to_logging=False,
+        sim_step=0.01,
+        sim_steps_per_env_step=1,
+        update_steps=1
+    )
+    
+    # Camera 2: Static overhead camera (tilted for better view)
+    static_camera = StaticFloatingCamera(
+        position=[0.0, 1.0, 1.0],  # Side angle: 0.5m right, 0.5m forward, 0.8m up
+        target=[0.0, 0.3, 0.1],    # Looking at object area (slightly above ground)
+        camera_args=camera_args,
+        name='overhead_camera',
+        normalize=False,
+        add_to_observation_space=False,
+        add_to_logging=False,
+        sim_step=0.01,
+        sim_steps_per_env_step=1,
+        update_steps=1
+    )
+    
+    print(f"✅ Created Camera Sensors")
+    print(f"   End-effector camera: {camera_args['type']} {camera_args['width']}x{camera_args['height']}")
+    print(f"   Overhead camera: Position [0.5, 0.5, 0.8] → Target [0.0, 0.3, 0.1] (tilted side view)")
+    print(f"   Overhead camera: Static at [0, 0, 1.0]")
     
     print(f"✅ Created Force/Torque Sensor (UR5-specific)")
     print(f"   Measuring at joint: {ft_sensor.joint_name}")
@@ -174,7 +265,21 @@ def main():
     # Initialize force/torque sensor
     ft_sensor.reset()
     
+    # Initialize cameras
+    ee_camera.reset()
+    static_camera.reset()
+    
+    print("\n📸 Camera test - capturing initial images...")
+    ee_camera.update(0)
+    static_camera.update(0)
+    static_image = static_camera.get_observation()[f'camera_rgb_overhead_camera']
+    print(f"   Overhead camera image shape: {static_image.shape}")
+    
+    print("Save Image")
+    cv2.imwrite('overhead_camera_initial.png', cv2.cvtColor(static_image, cv2.COLOR_RGB2BGR))
+    
     # Test 1: Measure forces while approaching box
+    
     print("\n" + "=" * 60)
     print("Test 1: Approaching Box")
     print("=" * 60)
@@ -209,19 +314,33 @@ def main():
         
         if distance < 0.005:  # Closer threshold
             print(f"   ✅ Reached target! Distance={distance:.4f}m")
+            
+            # Capture image from wrist camera when target is reached
+            print("\n📸 Capturing wrist camera image at target...")
+            ee_camera.update(i)
+            ee_image_at_target = ee_camera.get_observation()[f'camera_rgb_end_effector_camera']
+            cv2.imwrite('ee_camera_at_target.png', cv2.cvtColor(ee_image_at_target, cv2.COLOR_RGB2BGR))
+            print(f"   Saved: ee_camera_at_target.png (shape: {ee_image_at_target.shape})")
+            
             break
         
+        # Calculate incremental movement action
+        # Normalize the delta and scale it appropriately
+        # Action values should be small (-1 to 1) since they're multiplied by ik_xyz_delta (0.05m)
         if distance > 0.02:
-            delta_normalized = (delta / distance) * 0.5
+            # Far from target - moderate speed
+            movement = (delta / distance) * 0.5  # 0.5 * 0.05 = 2.5cm per step
         else:
-            delta_normalized = (delta / distance) * 0.1
+            # Close to target - slow for precision
+            movement = (delta / distance) * 0.2  # 0.2 * 0.05 = 1cm per step
         
+        # Create action: [dx, dy, dz, droll, dpitch, dyaw, gripper]
         action = np.array([
-            delta_normalized[0],
-            delta_normalized[1],
-            delta_normalized[2],
-            0, 0, 0,
-            -1.0
+            movement[0],
+            movement[1], 
+            movement[2],
+            0, 0, 0,  # No rotation change
+            -1.0      # Gripper open
         ])
         
         robot.process_action(action)
@@ -232,13 +351,15 @@ def main():
         if i % 50 == 0:
             joint_force = ft_sensor.get_joint_force
             contact_force = ft_sensor.get_contact_force
-            print(f"   Step {i}: Distance={distance:.4f}m")
+            print(f"   Step {i}: Distance={distance:.4f}m, Pos: [{current_pos[0]:.3f}, {current_pos[1]:.3f}, {current_pos[2]:.3f}]")
             print(f"      Joint Force: [{joint_force[0]:.2f}, {joint_force[1]:.2f}, {joint_force[2]:.2f}] N")
             print(f"      Contact Force: [{contact_force[0]:.2f}, {contact_force[1]:.2f}, {contact_force[2]:.2f}] N")
             print(f"      In contact: {ft_sensor.is_in_contact}")
         
         time.sleep(0.01)
     
+
+
     # Test 2: Close gripper and measure grasping forces
     print("\n" + "=" * 60)
     print("Test 2: Grasping Box - Measuring Forces")

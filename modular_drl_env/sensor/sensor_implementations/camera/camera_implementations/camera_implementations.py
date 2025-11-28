@@ -1,6 +1,7 @@
 import pybullet as pyb
 from typing import List
 from modular_drl_env.robot.robot_implementations.ur5 import UR5
+from modular_drl_env.util.pybullet_util import pybullet_util as pyb_u
 from ..camera_utils import *
 from ..camera import CameraBase
 
@@ -17,8 +18,12 @@ class StaticBodyCameraUR5(CameraBase):
         super().__init__(camera_args= camera_args, name= name, **kwargs)
 
     def _calculate_position(self):
-        effector_position, effector_orientation = pyb.getLinkState(self.robot.object_id, self.robot.end_effector_link_id)[4:6]
-        body_position, body_orientation = pyb.getLinkState(self.robot.object_id, self.robot.end_effector_link_id - 1)[4:6]
+        # Convert string IDs to PyBullet integer indices
+        robot_pyb_id = pyb_u.to_pb(self.robot.object_id)
+        ee_link_index = pyb_u.pybullet_link_ids[(self.robot.object_id, self.robot.end_effector_link_id)]
+        
+        effector_position, effector_orientation = pyb.getLinkState(robot_pyb_id, ee_link_index)[4:6]
+        body_position, body_orientation = pyb.getLinkState(robot_pyb_id, ee_link_index - 1)[4:6]
         effector_up_vector, effector_forward_vector, _ = directionalVectorsFromQuaternion(effector_orientation)
         self.camera_args['up_vector'] = effector_up_vector
         if self.relative_pos is None:
@@ -54,7 +59,10 @@ class StaticFloatingCameraFollowEffector(CameraBase):
         self.pos = position
 
     def _adapt_to_environment(self):
-        self.target = pyb.getLinkState(self.robot.object_id, self.robot.end_effector_link_id)[4]
+        # Convert string IDs to PyBullet integer indices
+        robot_pyb_id = pyb_u.to_pb(self.robot.object_id)
+        ee_link_index = pyb_u.pybullet_link_ids[(self.robot.object_id, self.robot.end_effector_link_id)]
+        self.target = pyb.getLinkState(robot_pyb_id, ee_link_index)[4]
         super()._adapt_to_environment()
 
     def get_data_for_logging(self) -> dict:

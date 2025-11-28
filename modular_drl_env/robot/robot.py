@@ -219,7 +219,7 @@ class Robot(ABC):
             # we calculate the changed position, then use inverse kinematics to get the equivalent joint angles
             # then we apply those
             pos_delta = action[:3] * self.xyz_delta
-            rpy_delta = action[3:] * self.rpy_delta
+            rpy_delta = action[3:6] * self.rpy_delta  # Only take roll, pitch, yaw (not gripper)
 
             new_pos = self.position_rotation_sensor.position + pos_delta
             new_rpy = quaternion_to_rpy(self.position_rotation_sensor.rotation) + rpy_delta
@@ -231,6 +231,7 @@ class Robot(ABC):
             # we apply them mostly as is
 
             # transform action (-1 to 1) to desired new joint angles
+            #new_joints = action * (self.joints_range / 2) + (self.joints_limits_lower + self.joints_limits_upper) / 2
             new_joints = action * (self.joints_range / 2) + (self.joints_limits_lower + self.joints_limits_upper) / 2
 
             # if we don't use the physics sim, which will only perform a step towards the desired new joints, 
